@@ -1,0 +1,806 @@
+class Cross : public Shape, public DE1SoCfpga {
+  public:
+    Cross(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      video_box(this->x + this->width / 4, this->y, this->x + this->width - (this->width / 4), this->y + this->height, this->color) ;
+      video_box(this->x, this->y + this->height / 4, this->x + this->width, this->y + this->height - (this->height / 4), this->color) ;
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      video_box(this->x + this->width / 4, this->y, this->x + this->width - (this->width / 4), this->y + this->height, resample_rgb(db, 0xFFFFFF)) ;
+      video_box(this->x, this->y + this->height / 4, this->x + this->width, this->y + this->height - (this->height / 4), resample_rgb(db, 0xFFFFFF)) ;
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class Circle : public Shape, public DE1SoCfpga {
+  public:
+    Circle(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      static const double PI = 3.1415926535;
+      double i, angle, xTemp, yTemp;
+      
+      for(i = 0; i < 360; i += 0.1)
+      {
+            angle = i;
+            xTemp = this->width / 2 * cos(angle * PI / 180);
+            yTemp = this->width / 2 * sin(angle * PI / 180);
+            write_pixel(x + xTemp, y + yTemp, color);
+      }
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class Triangle : public Shape, public DE1SoCfpga {
+  public:
+    Triangle(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      for(int i = this->y; i <= this->y + this->height; ++i)
+      {
+        for(int j = this->x ; j <= i; ++j)
+        {
+            write_pixel(j, i, this->color) ;
+        }
+      }
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class Rectangle : public Shape, public DE1SoCfpga {
+  public:
+    Rectangle(int x, int y, int width, int height, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = height ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      video_box(this->x, this->y, this->x + this->width, this->y + this->height, this->color) ;
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class Star : public Shape, public DE1SoCfpga {
+  public:
+    Star(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      for(int i = this->x ; i <= this->x + this->width ; i++) {
+        write_pixel(i, this->y + this->height / 2, this->color) ;
+      }
+      for(int i = this->y ; i <= this->y + this->height ; i++) {
+        write_pixel(this->x + this->width / 2, i, this->color) ;
+      }
+      
+      int xAcc = this->x + this->width / 4 ;
+      int yAcc = this->y + this->height / 4;
+      for(int i = 0 ; i <= this->width / 2 ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc++ ;
+      }
+      
+      xAcc = this->x + this->width / 4 ;
+      yAcc = this->y + this->height - this->height / 4;
+      for(int i = 0 ; i <= this->width / 2 ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc-- ;
+      } 
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class shapeX : public Shape, public DE1SoCfpga {
+  public:
+    shapeX(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      int xAcc = this->x ;
+      int yAcc = this->y;
+      
+      for(int i = 0 ; i <= this->width ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc++ ;
+      }
+      
+      xAcc = this->x ;
+      yAcc = this->y + this->height;
+      for(int i = 0 ; i <= this->width ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc-- ;
+      }
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class shapeL : public Shape, public DE1SoCfpga {
+  public:
+    shapeL(int x, int y, int height, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = height / 2 ;
+      this->height = height ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      for(int i = this->y ; i <= this->y + this->height ; i++) {
+        write_pixel(this->x, i, this->color) ;
+      }
+      for(int i = this->x ; i <= this->x + this->width ; i++) {
+        write_pixel(i, this->y + this->height, this->color) ;
+      }
+    }
+    
+        void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class shapeT : public Shape, public DE1SoCfpga {
+  public:
+    shapeT(int x, int y, int height, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = height / 2 ;
+      this->height = height ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      for(int i = this->x ; i <= this->x + this->width ; i++) {
+        write_pixel(i, this->y, this->color) ;
+      }
+      for(int i = this->y ; i <= this->y + this->height ; i++) {
+        write_pixel(this->x + this->width / 2, i, this->color) ;
+      }
+    }
+    
+        void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
+
+class shapeV : public Shape, public DE1SoCfpga {
+  public:
+    shapeV(int x, int y, int width, short color, int direcx, int direcy, int type) {
+      this->x = x ;
+      this->y = y ;
+      this->width = width ;
+      this->height = width / 2 ;
+      this->color = color ;
+      this->direcx = direcx ;
+      this->direcy = direcy ;
+      this->type = type ;
+    }
+    
+    void draw() {
+      int xAcc = this->x ;
+      int yAcc = this->y ;
+      for(int i = this->x ; i <= this->x + this->width / 2 ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc++ ;
+      }
+      
+      xAcc = this->x + this->width / 2 ;
+      yAcc = this->y + this->height ;
+      for(int i = this->x + this->width / 2 ; i <= this->x + this->width ; i++) {
+        write_pixel(xAcc, yAcc, this->color) ;
+        xAcc++ ;
+        yAcc-- ;
+      }
+    }
+    
+    void changeDirec(Shape *b) {
+      if ((this->x == b->x + b->width && this->y == b->y + b->height) || (b->x == this->x + this->width && b->y == this->y + this->height) ||
+          (this->y == b->y + b->height && b->x == this->x + this->width) || (b->y == this->y + this->height && this->x == b->x + b->width)) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->y == b->y + b->height || b->y == this->y + this->height) {
+        this->direcy *= -1 ;
+        b->direcy *= -1 ;
+        
+      } else if (this->x + this->width == b->x || b->x + b->width == this->x) {
+        this->direcx *= -1 ;
+        b->direcx *= -1 ;
+        
+      }
+    }
+    
+    bool isCollided(Shape *b) {
+      return ((this->x + this->width) >= b->x) &&
+             (this->x <= (b->x + b->width)) &&
+             ((this->y + this->height) >= b->y) &&
+             (this->y <= (b->y + b->height)) ;
+    }
+    
+    void clearShape() {
+      if(this->direcx == 1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == 1 && this->direcy == -1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y + this->height, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        
+      } else if (this->direcx == -1 && this->direcy == 1) {
+        for (int i = this->x ; i <= this->x + this->width ; i++) {
+          write_pixel(i, this->y, resample_rgb(16, 0xFFFFFF)) ;
+        }
+        for (int i = this->y ; i <= this->y + this->height ; i++) {
+          write_pixel(this->x + this->width, i, resample_rgb(16, 0xFFFFFF)) ;
+        }
+      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
+} ;
