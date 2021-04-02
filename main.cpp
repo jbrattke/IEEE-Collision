@@ -94,7 +94,7 @@ int main() {
     if(exit == 2) {
       lst = mtList ;
     }
-    
+    /*
     key = DE1->get_key() ;
     
     if(key == '1' && key != last) {
@@ -115,7 +115,7 @@ int main() {
     
     temp->draw() ;
     last = key ;
-    
+    */
     //shape3->move() ;
     
     //shape3->draw() ;

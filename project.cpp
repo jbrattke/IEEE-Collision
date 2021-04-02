@@ -6,8 +6,6 @@
 #include <iostream>
 #include <string>
 #include <cmath>
-#include <cstdio>
-#include <ctime>
 #include "address_map_arm.h"
 using namespace std;
 
@@ -16,13 +14,21 @@ using namespace std;
 #define INTEL_BLUE 0x0071C5
 #define RGB_RESAMPLER_BASE 0xFF203010
 
-const unsigned int MPCORE_PRIV_TIMER_LOAD_OFFSET = 0xFFFEC600 - LW_BRIDGE_BASE ;
+const unsigned int JP1_Data_Register = 0xFF200060 - LW_BRIDGE_BASE;
+const unsigned int JP1_Direction_Register = 0xFF200064 - LW_BRIDGE_BASE;
+
+const unsigned int MPCORE_PRIV_TIMER_LOAD_OFFSET = 0xDEC600 ;
 const unsigned int MPCORE_PRIV_TIMER_COUNTER_OFFSET = 0xFFFEC604 - LW_BRIDGE_BASE ;
 const unsigned int MPCORE_PRIV_TIMER_CONTROL_OFFSET = 0xFFFEC608 - LW_BRIDGE_BASE ;
 const unsigned int MPCORE_PRIV_TIMER_INTERRUPT_OFFSET = 0xFFFEC60C - LW_BRIDGE_BASE ;
 
-const unsigned int JP1_Data_Register = 0xFF200060 - LW_BRIDGE_BASE;
-const unsigned int JP1_Direction_Register = 0xFF200064 - LW_BRIDGE_BASE;
+//TO-DO LIST
+// - make classes for all other shapes(draw functions too)
+// - get keypad working(placing shapes, growing, etc)
+//   - 1 requests shape, 2 shrinks, 3 grows, 4 places(HAVE TO MAKE PLACE FUNCTION)
+// - get sound working on collisions - TUESDAY DONE??
+// - CPU timing
+// - Algorithm improvement --> using sphere AABB? TREE?
 
 class DE1SoCfpga 
 {
@@ -36,9 +42,6 @@ class DE1SoCfpga
     int video_resolution;
     int db;
     int rgb_status;
-    unsigned int initialvalueLoadMPCore ;
-    unsigned int initialvalueControlMPCore ;
-    unsigned int initialvalueInterruptMPCore ;
     
     DE1SoCfpga() 
     {
@@ -88,19 +91,13 @@ class DE1SoCfpga
       // Get the address that maps to the FPGA LED control 
       pBase_Pixel = vga_pixel_virtual_base ;
       
-      //-- VIDEO CONSTANTS ------
+      //-- CONSTANTS ------
       video_resolution = RegisterRead(PIXEL_BUF_CTRL_BASE + 0x8)  ;
       screen_x = video_resolution & 0xFFFF;
       screen_y = (video_resolution >> 16) & 0xFFFF;
       
       rgb_status = RegisterRead(RGB_RESAMPLER_BASE - LW_BRIDGE_BASE);
       db = get_data_bits(rgb_status & 0x3F);
-      
-      // -- AUDIO ----
-      initialvalueLoadMPCore = RegisterRead(MPCORE_PRIV_TIMER_LOAD_OFFSET);
-      initialvalueControlMPCore = RegisterRead(MPCORE_PRIV_TIMER_CONTROL_OFFSET);
-      initialvalueInterruptMPCore = RegisterRead(MPCORE_PRIV_TIMER_INTERRUPT_OFFSET);
-      RegisterWrite(JP1_Direction_Register, 1) ;
     }
    
    ~DE1SoCfpga() 
@@ -122,10 +119,6 @@ class DE1SoCfpga
       cout << "ERROR: munmap() failed..." << endl;
       exit(1);
 	    }
-         
-      RegisterWrite(MPCORE_PRIV_TIMER_LOAD_OFFSET, initialvalueLoadMPCore);
-      RegisterWrite(MPCORE_PRIV_TIMER_CONTROL_OFFSET, initialvalueControlMPCore);
-      RegisterWrite(MPCORE_PRIV_TIMER_INTERRUPT_OFFSET, initialvalueInterruptMPCore);
       
       close (fd); 	// close memory
    }
@@ -249,22 +242,22 @@ class DE1SoCfpga
     return (200000000/Hz) / 2 ;
   }
   
-  int playNote() {
+  void playNote() {
       double cycles = 100000000;
       int sum = 0 ;
       int switchtone = 0 ;
       int counter = Get_Count(1046.5) ;
       
-      //int dataBase = RegisterRead(JP1_Data_Register) ;
+      int dataBase = RegisterRead(JP1_Data_Register) ;
 
       RegisterWrite(MPCORE_PRIV_TIMER_LOAD_OFFSET, counter) ;
       RegisterWrite(MPCORE_PRIV_TIMER_CONTROL_OFFSET, 3) ;
       
-      while (sum < cycles)
+      while (sum<cycles)
       {
         if (RegisterRead(MPCORE_PRIV_TIMER_INTERRUPT_OFFSET) != 0) 
         {
-          sum = sum + counter ;
+          sum=sum+counter;
           RegisterWrite(MPCORE_PRIV_TIMER_INTERRUPT_OFFSET, 1) ;
           // reset timer flag bit
 
@@ -280,8 +273,6 @@ class DE1SoCfpga
           }
         }
       }
-      
-      return 0 ;
   }
 
 } ;
@@ -298,16 +289,7 @@ class Shape {
     int type ;
     
     virtual void draw() {}
-    
-    Shape * move() {
-      this->clearShape() ;
-      this->edgeCheck() ;
-      this->x = this->x + this->direcx ;
-      this->y = this->y + this->direcy ;
-
-      return this ;
-    }
-    
+    virtual Shape * move() {}
     virtual void clearShape() {}
      
     bool isCollided(Shape *b) {
@@ -364,25 +346,20 @@ class Square : public Shape, public DE1SoCfpga {
     }
     
     void draw() {
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, this->y, this->color) ;
-        write_pixel(i, this->y + this->height, this->color) ;
-      }
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        write_pixel(this->x, i, this->color) ;
-        write_pixel(this->x + this->width, i, this->color) ;
-      }
+      video_box(this->x, this->y, this->x + this->width, this->y + this->width, this->color) ;
     }
     
     void clearShape() {
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, this->y, resample_rgb(db, 0xFFFFFF)) ;
-        write_pixel(i, this->y + this->height, resample_rgb(db, 0xFFFFFF)) ;
-      }
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        write_pixel(this->x, i, resample_rgb(db, 0xFFFFFF)) ;
-        write_pixel(this->x + this->width, i, resample_rgb(db, 0xFFFFFF)) ;
-      }
+      video_box(this->x, this->y, this->x + this->width, this->y + this->width, resample_rgb(db, 0xFFFFFF)) ;
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
     
 } ;
@@ -401,48 +378,22 @@ class Cross : public Shape, public DE1SoCfpga {
     }
     
     void draw() {
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        if(this->x + this->width / 4 < i && i < this->x + 3 * (this->width / 4)) {
-          write_pixel(i, this->y, this->color) ;
-          write_pixel(i, this->y + this->height, this->color) ;
-        } else {
-          write_pixel(i, this->y + this->height / 4, this->color) ;
-          write_pixel(i, this->y + 3 * (this->height / 4), this->color) ;
-        }
-      }
-      
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        if(this->y + this->height / 4 < i && i < this->y + 3 * (this->height / 4)) {
-          write_pixel(this->x, i, this->color) ;
-          write_pixel(this->x + this->width, i, this->color) ;
-        } else {
-          write_pixel(this->x + this->width / 4, i, this->color) ;
-          write_pixel(this->x + 3 * (this->width / 4), i, this->color) ;
-        }
-      }
+      video_box(this->x + this->width / 4, this->y, this->x + this->width - (this->width / 4), this->y + this->height, this->color) ;
+      video_box(this->x, this->y + this->height / 4, this->x + this->width, this->y + this->height - (this->height / 4), this->color) ;
     }
     
     void clearShape() {
-      short int color = resample_rgb(db, 0xFFFFFF) ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        if(this->x + this->width / 4 < i && i < this->x + 3 * (this->width / 4)) {
-          write_pixel(i, this->y, color) ;
-          write_pixel(i, this->y + this->height, color) ;
-        } else {
-          write_pixel(i, this->y + this->height / 4, color) ;
-          write_pixel(i, this->y + 3 * (this->height / 4), color) ;
-        }
-      }
-      
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        if(this->y + this->height / 4 < i && i < this->y + 3 * (this->height / 4)) {
-          write_pixel(this->x, i, color) ;
-          write_pixel(this->x + this->width, i, color) ;
-        } else {
-          write_pixel(this->x + this->width / 4, i, color) ;
-          write_pixel(this->x + 3 * (this->width / 4), i, color) ;
-        }
-      }
+      video_box(this->x + this->width / 4, this->y, this->x + this->width - (this->width / 4), this->y + this->height, resample_rgb(db, 0xFFFFFF)) ;
+      video_box(this->x, this->y + this->height / 4, this->x + this->width, this->y + this->height - (this->height / 4), resample_rgb(db, 0xFFFFFF)) ;
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
 } ;
 
@@ -460,7 +411,6 @@ class Circle : public Shape, public DE1SoCfpga {
     }
     
     void draw() {
-    /*
       static const double PI = 3.1415926535;
       double i, angle, xTemp, yTemp;
       
@@ -471,21 +421,9 @@ class Circle : public Shape, public DE1SoCfpga {
             yTemp = this->width / 2 * sin(angle * PI / 180);
             write_pixel(x + xTemp, y + yTemp, color);
       }
-      */
-      int xAcc = this->x ;
-      int yAcc = this->y + this->height / 2 ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, this->color) ;
-        yAcc += (i <= this->x + this->width / 2) ?  1 : -1 ;
-      }
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, this->color) ;
-        yAcc += (i < this->x + this->width / 2) ?  -1 : 1 ;
-      }
     }
     
     void clearShape() {
-    /*
       static const double PI = 3.1415926535;
       double i, angle, xTemp, yTemp;
       
@@ -496,18 +434,15 @@ class Circle : public Shape, public DE1SoCfpga {
             yTemp = this->width / 2 * sin(angle * PI / 180);
             write_pixel(x + xTemp, y + yTemp, resample_rgb(db, 0xFFFFFF));
       }
-      */
-      short int color = resample_rgb(db, 0xFFFFFF) ;
-      int xAcc = this->x ;
-      int yAcc = this->y + this->height / 2 ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, color) ;
-        yAcc += (i <= this->x + this->width / 2) ?  1 : -1 ;
-      }
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, color) ;
-        yAcc += (i < this->x + this->width / 2) ?  -1 : 1 ;
-      }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
 } ;
 
@@ -517,7 +452,7 @@ class Triangle : public Shape, public DE1SoCfpga {
       this->x = x ;
       this->y = y ;
       this->width = width ;
-      this->height = width / 2;
+      this->height = width ;
       this->color = color ;
       this->direcx = direcx ;
       this->direcy = direcy ;
@@ -525,24 +460,32 @@ class Triangle : public Shape, public DE1SoCfpga {
     }
     
     void draw() {
-      int xAcc = this->x ;
-      int yAcc = this->y + this->height ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, this->color) ;
-        write_pixel(i, this->y + this->height, this->color) ;
-        yAcc += (i <= this->x + this->width / 2) ?  -1 : 1 ;
+      for(int i = this->y; i <= this->y + this->height; ++i)
+      {
+        for(int j = this->x ; j <= i; ++j)
+        {
+            write_pixel(j, i, this->color) ;
+        }
       }
     }
     
     void clearShape() {
-      short int color = resample_rgb(db, 0xFFFFFF) ;
-      int xAcc = this->x ;
-      int yAcc = this->y + this->height ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, yAcc, color) ;
-        write_pixel(i, this->y + this->height, color) ;
-        yAcc += (i <= this->x + this->width / 2) ?  -1 : 1 ;
+      for(int i = this->y; i <= this->y + this->height; ++i)
+      {
+        for(int j = this->x ; j <= i; ++j)
+        {
+            write_pixel(j, i, resample_rgb(db, 0xFFFFFF)) ;
+        }
       }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
 } ;
 
@@ -560,26 +503,20 @@ class Rectangle : public Shape, public DE1SoCfpga {
     }
     
     void draw() {
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, this->y, this->color) ;
-        write_pixel(i, this->y + this->height, this->color) ;
-      }
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        write_pixel(this->x, i, this->color) ;
-        write_pixel(this->x + this->width, i, this->color) ;
-      }
+      video_box(this->x, this->y, this->x + this->width, this->y + this->height, this->color) ;
     }
     
     void clearShape() {
-      short int color = resample_rgb(db, 0xFFFFFF) ;
-      for (int i = this->x ; i <= this->x + this->width ; i++) {
-        write_pixel(i, this->y, color) ;
-        write_pixel(i, this->y + this->height, color) ;
-      }
-      for (int i = this->y ; i <= this->y + this->height ; i++) {
-        write_pixel(this->x, i, color) ;
-        write_pixel(this->x + this->width, i, color) ;
-      }
+      video_box(this->x, this->y, this->x + this->width, this->y + this->height, resample_rgb(db, 0xFFFFFF)) ;
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
 } ;
 
@@ -645,6 +582,15 @@ class Star : public Shape, public DE1SoCfpga {
         yAcc-- ;
       }
     }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
 } ;
 
 class shapeX : public Shape, public DE1SoCfpga {
@@ -697,6 +643,15 @@ class shapeX : public Shape, public DE1SoCfpga {
         yAcc-- ;
       }
     }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
 } ;
 
 class shapeL : public Shape, public DE1SoCfpga {
@@ -729,6 +684,15 @@ class shapeL : public Shape, public DE1SoCfpga {
         write_pixel(i, this->y + this->height, resample_rgb(db, 0xFFFFFF)) ;
       }
     }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
 } ;
 
 class shapeT : public Shape, public DE1SoCfpga {
@@ -760,6 +724,15 @@ class shapeT : public Shape, public DE1SoCfpga {
       for(int i = this->y ; i <= this->y + this->height ; i++) {
         write_pixel(this->x + this->width / 2, i, resample_rgb(db, 0xFFFFFF)) ;
       }
+    }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
     }
 } ;
 
@@ -811,14 +784,22 @@ class shapeV : public Shape, public DE1SoCfpga {
         yAcc++ ;
       }
     }
+    
+    Shape * move() {
+      this->clearShape() ;
+      this->edgeCheck() ;
+      this->x = this->x + this->direcx ;
+      this->y = this->y + this->direcy ;
+
+      return this ;
+    }
 } ;
 
 class shapeChanger {
   public:
   
     Shape * changeShape(Shape *shape) {
-      shape->clearShape() ;
-      
+    
       Shape *output = shape ;
       
       if(shape->type == 1) { output = new Cross(shape->x, shape->y, shape->width, shape->color, shape->direcx, shape->direcy, 2) ; } 
@@ -950,6 +931,10 @@ class loMtShapes : public loShapes, public Shape {
       return this ;
     }
     
+    Shape * moveShape(Shape *shape) {
+      
+    }
+    
     int size() {
       return 0 ;
     }
@@ -971,9 +956,6 @@ class loMtShapes : public loShapes, public Shape {
 
 
 int main() {
-  //--------- CLOCK ----------
-  double elapstedTime ;
-  clock_t start = clock() ;
 
   // -------------- SETUP -------------
   DE1SoCfpga *DE1 = new DE1SoCfpga ;
@@ -1001,7 +983,6 @@ int main() {
   
   loShapes *shapeList = mtList ;
   
-  DE1->playNote() ;
 // ---------------- MAIN SECTION ----------------------
   
   //shapeList->addShape(b1) ;
@@ -1063,7 +1044,12 @@ int main() {
     
     if(button == 1 && count != 1) {
       count = 1 ;
-      temp = flag ? change->changeShape(temp) : new Square(150, 110, 30, 0, 1, 1, 1) ;
+      if (flag) {
+        temp->clearShape() ;
+        temp = change->changeShape(temp) ;
+      } else {
+        temp = new Square(150, 110, 30, 0, 1, 1, 1) ;
+      }
       flag = true ;
     } else if (button == 2 && count != 2) {
       count = 2;
@@ -1108,7 +1094,6 @@ int main() {
   
   DE1->clear_screen() ;
   delete DE1 ;
-  
 }
 
 
